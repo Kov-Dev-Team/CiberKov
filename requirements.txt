@@ -2,5 +2,5 @@ discord.py>=2.4.0
 yt-dlp
 PyNaCl
 python-dotenv
-asyncio
 utils
+deno>=2.3.1
