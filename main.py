@@ -13,9 +13,11 @@ from discord import ui
 from datetime import datetime
 from datetime import timedelta
 
+# HOSTING CONFIG
 load_dotenv()
 token = os.getenv("DISCORD_TOKEN")
 
+# DISCORD SERVER (FEDERAÇÃO E STB) E COMMAND SYNC
 GUILD_IDS = [1162538768394367016, 1469139801365151787]
 MY_GUILDS = [discord.Object(id=guild_id) for guild_id in GUILD_IDS]
 
@@ -42,6 +44,7 @@ intents.presences = True
 
 client = MyClient(intents=intents)
 
+# MUSIC CONFIG FFMPEG
 YTDL_OPTIONS = {
     'format': 'bestaudio/best',
     'noplaylist': True,
@@ -55,11 +58,9 @@ FFMPEG_OPTIONS = {
     'before_options': '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5'
 }
 
-
 def _is_url(text: str) -> bool:
     return text.startswith("http://") or text.startswith("https://")
-
-
+    
 async def resolve_track(query: str) -> Optional[dict]:
     """
     Aceita tanto uma URL do YouTube quanto um termo de busca livre.
@@ -113,7 +114,6 @@ def after_playback(error, interaction: discord.Interaction, query: str):
     else:
         print("Reprodução concluída com sucesso.")
 
-
 async def reconnect_and_play(interaction: discord.Interaction, query: str):
     await asyncio.sleep(2)
 
@@ -140,7 +140,7 @@ async def reconnect_and_play(interaction: discord.Interaction, query: str):
                 ephemeral=True
             )
 
-
+# RICH PRESENCE 
 @client.event
 async def on_ready():
     print(f'Online como: {client.user} (ID: {client.user.id})')
@@ -149,14 +149,14 @@ async def on_ready():
         activity=discord.Game(name="Comendo o cu de curisoso")
     )
         
-        
+# IGOR PRUDOV ACESS        
 def e_dono():
     async def predicate(interaction: discord.Interaction) -> bool:
         ID_DONO = 1047129198508113990 
         return interaction.user.id == ID_DONO
     return app_commands.check(predicate)        
         
-       
+# V2 STANDARD COMMANDS FROM CLASSES      
 @client.tree.command()
 @app_commands.default_permissions(manage_messages=True)
 async def cons_fed(interaction: discord.Interaction):
@@ -171,8 +171,7 @@ async def cons_fed(interaction: discord.Interaction):
     await interaction.response.defer()
 
     await interaction.followup.send(view=comp, allowed_mentions=m, silent=False)
-    
-    
+       
 @client.tree.command()
 @app_commands.default_permissions(manage_messages=True)
 async def livepix(interaction: discord.Interaction):
@@ -188,7 +187,7 @@ async def livepix(interaction: discord.Interaction):
     
     await interaction.followup.send(view=comp, allowed_mentions=m, silent=False)
 
-
+# V2 BOLETINS
 class BOLayout(ui.LayoutView):
     def __init__(
         self,
@@ -234,7 +233,7 @@ class BOLayout(ui.LayoutView):
         ))
         self.add_item(container)
 
-
+# GET FORUM TAG
 class TagDropdown(ui.Select):
     def __init__(self, options, parent_view):
         super().__init__(placeholder="Escolha uma tag para a postagem:", options=options)
@@ -257,7 +256,6 @@ class TagDropdown(ui.Select):
             self.parent_view.autor
         )
 
-
         await self.parent_view.forum_channel.create_thread(
             name=self.parent_view.titulo,
             view=layout_bo, 
@@ -265,6 +263,7 @@ class TagDropdown(ui.Select):
         )
 
         await interaction.response.edit_message(content=f"✅ BO registrado com sucesso!", view=None)
+
 
 class TagSelectView(ui.View):
     def __init__(self, forum_channel, titulo, autor, usuario, descricao, regra, agravo, deliberacao, executor):
@@ -278,8 +277,7 @@ class TagSelectView(ui.View):
         self.agravo = agravo
         self.deliberacao = deliberacao
         self.executor = executor
-
-        
+       
         options = [
             discord.SelectOption(label=tag.name, value=str(tag.id)) 
             for tag in forum_channel.available_tags[:25]
@@ -287,7 +285,7 @@ class TagSelectView(ui.View):
         
         self.add_item(TagDropdown(options, self))
 
-
+# BOLETIM COMMAND 
 @client.tree.command(name="boletim")
 @app_commands.default_permissions(manage_messages=True)
 async def boletim(
