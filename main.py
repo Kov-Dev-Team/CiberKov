@@ -4,7 +4,6 @@ import discord
 import yt_dlp
 import os
 from dotenv import load_dotenv
-import discord
 from classes import ccf, clp
 from typing import Optional
 from discord.ext import commands
@@ -141,14 +140,26 @@ async def reconnect_and_play(interaction: discord.Interaction, query: str):
             )
 
 # RICH PRESENCE 
+atividades = [
+             discord.Streaming(name="Comendo o cu de curioso...", url=" https://www.youtube.com/@BiahKov"),
+             discord.Streaming(name="Resenhex com os guri 🎮", url="https://twitch.tv/biahkov")
+]
+
+async def loop_mudar_status():
+    await client.wait_until_ready()
+
+    while not client.is_closed():
+        for atividade in atividades:
+
+            await client.change_presence(activity=atividade)
+            await asyncio.sleep(15)
+
 @client.event
 async def on_ready():
     print(f'Online como: {client.user} (ID: {client.user.id})')
-    await client.change_presence(
-        status=discord.Status.online,
-        activity=discord.Game(name="Comendo o cu de curisoso")
-    )
-        
+
+client.loop.create_task(loop_mudar_status())    
+
 # IGOR PRUDOV ACESS        
 def e_dono():
     async def predicate(interaction: discord.Interaction) -> bool:
