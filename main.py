@@ -15,7 +15,6 @@ from datetime import timedelta
 GUILD_IDS = [1162538768394367016, 1469139801365151787]
 MY_GUILDS = [discord.Object(id=guild_id) for guild_id in GUILD_IDS]
 
-
 class MyClient(discord.Client):
     def __init__(self, *, intents: discord.Intents):
         super().__init__(intents=intents)
@@ -28,15 +27,11 @@ class MyClient(discord.Client):
 
         print(f"Sincronização concluída para {len(MY_GUILDS)} servidores.")
 
-
-# Em vez de Intents.all(), liste só o que você realmente usa.
-# Isso evita que o bot falhe ao logar caso você não tenha habilitado
-# os intents privilegiados (presences/members) no Developer Portal.
 intents = discord.Intents.default()
 intents.voice_states = True
 intents.message_content = True
-intents.members = True       # descomente se precisar (intent privilegiado)
-intents.presences = True     # descomente se precisar (intent privilegiado)
+intents.members = True      
+intents.presences = True     
 
 client = MyClient(intents=intents)
 
@@ -72,7 +67,6 @@ async def resolve_track(query: str) -> Optional[dict]:
     def _extract():
         with yt_dlp.YoutubeDL(YTDL_OPTIONS) as ydl:
             info = ydl.extract_info(search_target, download=False)
-            # Quando é busca (ytsearch), o resultado vem dentro de 'entries'
             if 'entries' in info:
                 if not info['entries']:
                     return None
@@ -105,7 +99,6 @@ async def get_audio_source(track: dict) -> Optional[discord.FFmpegPCMAudio]:
 def after_playback(error, interaction: discord.Interaction, query: str):
     if error:
         print(f"Erro no player: {error}")
-        # Bug corrigido: era "bot.loop", mas o client se chama "client".
         asyncio.run_coroutine_threadsafe(
             reconnect_and_play(interaction, query),
             client.loop
@@ -125,8 +118,6 @@ async def reconnect_and_play(interaction: discord.Interaction, query: str):
             ephemeral=True
         )
 
-        # Re-resolve do zero: a URL direta de áudio do yt_dlp expira,
-        # então não dá pra só tentar tocá-la de novo.
         track = await resolve_track(query)
         new_source = await get_audio_source(track) if track else None
 
@@ -290,7 +281,6 @@ class TagSelectView(ui.View):
         self.add_item(TagDropdown(options, self))
 
 
-
 @client.tree.command(name="boletim")
 @app_commands.default_permissions(manage_messages=True)
 async def boletim(
@@ -367,8 +357,6 @@ async def desconectar(interaction: discord.Interaction):
         await voice_client.disconnect()
         await interaction.followup.send("Saí do canal", ephemeral=True)
 
-# ==================== ESTRUTURAS DE FILA ====================
-
 class GuildMusicState:
     def __init__(self):
         self.queue: list[dict] = []
@@ -394,9 +382,6 @@ def get_state(guild_id: int) -> GuildMusicState:
         music_states[guild_id] = GuildMusicState()
     return music_states[guild_id]
 
-
-# ==================== HELPER: STATUS DO CANAL DE VOZ ====================
-
 async def set_voice_status(voice_channel: discord.VoiceChannel, text: str):
     try:
         await voice_channel.edit(status=text)
@@ -404,9 +389,6 @@ async def set_voice_status(voice_channel: discord.VoiceChannel, text: str):
         print(f"Não foi possível definir status do canal: {e}")
     except AttributeError:
         print("Sua versão do discord.py não suporta status de canal de voz. Atualize para >= 2.4.")
-
-
-# ==================== LAYOUT VIEW (COMPONENTS V2) ====================
 
 class PlayerView(discord.ui.LayoutView):
     def __init__(self, guild_id: int, track: dict, queue_size: int, loop: bool):
@@ -535,8 +517,6 @@ class PlayerView(discord.ui.LayoutView):
         await interaction.response.edit_message(view=stopped_view)
 
 
-# ==================== LÓGICA DE REPRODUÇÃO ====================
-
 async def start_playing(guild: discord.Guild, track: dict):
     state = get_state(guild.id)
     vc = guild.voice_client
@@ -595,8 +575,6 @@ async def play_next(guild: discord.Guild, error=None):
 
         await start_playing(guild, next_track)
 
-
-# ==================== COMANDOS ====================
 
 @client.tree.command(name="tocar")
 @app_commands.describe(busca="Um link do YouTube OU o nome/artista da música")
@@ -659,8 +637,7 @@ async def on_app_command_error(self, interaction: discord.Interaction, error: ap
 
 @client.tree.command(name="acessar_elite", description="Requisita um cargo especial no servidor parceiro.")
 async def acessar_elite(interaction: discord.Interaction):
-    # 1. Obter o servidor de destino
-    # 1. Trava de segurança extra (caso haja algum bug visual do Discord)
+
     if interaction.guild_id != (1436139252567248956):
         await interaction.response.send_message("❌ Este comando só pode ser utilizado no servidor oficial de requisições.", ephemeral=True)
         return
@@ -671,24 +648,20 @@ async def acessar_elite(interaction: discord.Interaction):
         await interaction.response.send_message("❌ Erro: O bot não está no servidor de destino ou a ID está incorreta.", ephemeral=True)
         return
 
-    # 2. Obter o usuário no servidor de destino
     member_destino = guild_destino.get_member(interaction.user.id)
     if not member_destino:
         await interaction.response.send_message("❌ Você precisa entrar no servidor de destino primeiro para receber o cargo!", ephemeral=True)
         return
 
-    # 3. Obter o cargo pré-selecionado
     cargo = guild_destino.get_role(1475307032415436840)
     if not cargo:
         await interaction.response.send_message("❌ Erro: Cargo não encontrado no servidor de destino. Avise a moderação.", ephemeral=True)
         return
 
-    # 4. Verificar se o usuário já possui o cargo
     if cargo in member_destino.roles:
         await interaction.response.send_message("⚠️ Você já possui este cargo no servidor!", ephemeral=True)
         return
 
-    # 5. Tentar adicionar o cargo
     try:
         await member_destino.add_roles(cargo, reason=f"Cargo requisitado via comando no servidor {interaction.guild.name}")
         await interaction.response.send_message(f"✅ Sucesso! O cargo **{cargo.name}** foi adicionado a você no servidor **{guild_destino.name}**.", ephemeral=True)
@@ -726,7 +699,7 @@ async def timeout(
     motivo: Optional[str] = None
 ):
     membros = [membro_1, membro_2, membro_4, membro_4, membro_5]
-    ID_PERMITIDO = 1047129198508113990  # Substitua por um número inteiro (sem aspas)
+    ID_PERMITIDO = 1047129198508113990 
     
     if interaction.user.id != ID_PERMITIDO:
         await interaction.response.send_message(
@@ -741,7 +714,6 @@ async def timeout(
         )
         return
     
-    # Avisa a API que o bot está processando o comando (evita "A interação falhou")
     await interaction.response.defer()
     
     alvos = [m for m in [membro_1, membro_2, membro_3, membro_4, membro_5] if m is not None]
@@ -758,7 +730,7 @@ async def timeout(
             await membro.timeout(duracao, reason=motivo)
             sucesso += 1
             membros_punidos.append(membro.mention)
-            await asyncio.sleep(1) # Pausa para evitar bloqueio da API (Rate Limit)
+            await asyncio.sleep(1) 
         except discord.Forbidden:
             falha += 1
         except Exception:
@@ -783,9 +755,8 @@ async def timeout(
 @app_commands.describe(membro="O membro que terá o timeout removido")
 async def retimeout(interaction: discord.Interaction, membro: discord.Member):
     
-    ID_PERMITIDO = 1047129198508113990  # ID do usuário permitido
+    ID_PERMITIDO = 1047129198508113990  
     
-    # 1. Verificação de permissão do usuário
     if interaction.user.id != ID_PERMITIDO:
         await interaction.response.send_message(
             "❌ Você não tem permissão exclusiva para usar este comando.", 
@@ -793,7 +764,6 @@ async def retimeout(interaction: discord.Interaction, membro: discord.Member):
         )
         return
     
-    # Usamos defer() para dar tempo ao bot de processar, caso a API do Discord demore
     await interaction.response.defer(ephemeral=True)
     
     try:
@@ -842,8 +812,6 @@ async def ban(interaction: discord.Interaction, membro: discord.Member, motivo: 
     except Exception as e:
         await interaction.followup.send(f"❌ Ocorreu um erro inesperado: {e}")
         
-# Dicionário global para armazenar temporariamente os overwrites de cada canal
-# Estrutura: { id_do_canal: discord.PermissionOverwrite }
 lockdown_cache = {}
 
 @client.tree.command(name="lockdown", description="Salva as permissões atuais e bloqueia o servidor (Lockdown).")
@@ -866,20 +834,16 @@ async def lockdown(interaction: discord.Interaction):
     sucesso = 0
     falhas = 0
 
-    # Limpa o cache anterior para evitar conflitos de lockdowns passados
     lockdown_cache.clear()
 
     for channel in guild.channels:
         try:
-            # Pega as permissões exatas que o @everyone tem NESTE canal agora
             overwrite_antigo = channel.overwrites_for(cargo_everyone)
             
-            # Salva uma cópia exata no cache usando o ID do canal como chave
             lockdown_cache[channel.id] = discord.PermissionOverwrite(
                 **{perm: val for perm, val in overwrite_antigo if val is not None}
             )
             
-            # Cria um novo overwrite baseado no antigo, mas forçando o bloqueio
             novo_overwrite = channel.overwrites_for(cargo_everyone)
             novo_overwrite.send_messages = False
             novo_overwrite.send_messages_in_threads = False
@@ -924,12 +888,10 @@ async def unlock(interaction: discord.Interaction):
     falhas = 0
 
     for channel in guild.channels:
-        # Verifica se temos o histórico desse canal guardado no cache
         if channel.id in lockdown_cache:
             try:
                 overwrite_original = lockdown_cache[channel.id]
                 
-                # Se o overwrite original estava completamente zerado/limpo, removemos a linha do @everyone
                 if overwrite_original.is_empty():
                     await channel.set_permissions(cargo_everyone, overwrite=None, reason=f"Lockdown desativado por {interaction.user} (Restaurado ao original)")
                 else:
@@ -942,13 +904,11 @@ async def unlock(interaction: discord.Interaction):
                 print(f"Erro ao restaurar o canal {channel.name}: {e}")
                 falhas += 1
         else:
-            # Caso um canal novo tenha sido criado DURANTE o lockdown, apenas limpamos as permissões dele
             try:
                 await channel.set_permissions(cargo_everyone, overwrite=None, reason="Lockdown desativado (Canal sem histórico)")
             except:
                 pass
 
-    # Limpa o cache após a restauração bem-sucedida
     lockdown_cache.clear()
 
     mensagem = f"🔓 **Lockdown Desativado!**\nAs permissões originais de `{sucesso}` canais foram restauradas com sucesso."
@@ -958,4 +918,4 @@ async def unlock(interaction: discord.Interaction):
     await interaction.followup.send(mensagem)
 
        
-client.run(token)
+client.run(f'{token}')
