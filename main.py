@@ -2,6 +2,7 @@ import utils
 import asyncio
 import discord
 import yt_dlp
+from segredo import token
 from classes import ccf, clp
 from typing import Optional
 from discord.ext import commands
@@ -957,6 +958,4 @@ async def unlock(interaction: discord.Interaction):
     await interaction.followup.send(mensagem)
 
        
-client.run('MTM4NDQwNzU0NzQ2MDQ1NjUwOQ.Gx1g83.vYghJBbG4S7MNzijUBI4blv2dlA95pC2ApuepM')
-#client.run('MTM4NDQwNzU0NzQ2MDQ1NjUwOQ.GH8WQS.iAuOod_zoBEMkI9Fu5cK2SGwkV7npQ_88bZiUU')
-#client.run('MTM2ODEzOTM2NDgwNjE2NDYwMQ.GbE1NI.UhfFMbW_X29JFMZPXtdMjZwS2EwgEBXLfZH8Wk')
+client.run(token)
