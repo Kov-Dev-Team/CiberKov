@@ -2,7 +2,9 @@ import utils
 import asyncio
 import discord
 import yt_dlp
-from segredo import token
+import os
+from dotenv import load_dotenv
+import discord
 from classes import ccf, clp
 from typing import Optional
 from discord.ext import commands
@@ -11,6 +13,8 @@ from discord import ui
 from datetime import datetime
 from datetime import timedelta
 
+load_dotenv()
+token = os.getenv("DISCORD_TOKEN")
 
 GUILD_IDS = [1162538768394367016, 1469139801365151787]
 MY_GUILDS = [discord.Object(id=guild_id) for guild_id in GUILD_IDS]
@@ -23,7 +27,10 @@ class MyClient(discord.Client):
     async def setup_hook(self):
         for guild_obj in MY_GUILDS:
             self.tree.copy_global_to(guild=guild_obj)
-            await self.tree.sync(guild=guild_obj)
+            try:
+                await self.tree.sync(guild=guild_obj)
+            except discord.errors.Forbidden:
+                print(f"Aviso: Sem acesso para sincronizar comandos no servidor {guild_obj.id}.")
 
         print(f"Sincronização concluída para {len(MY_GUILDS)} servidores.")
 
@@ -918,4 +925,4 @@ async def unlock(interaction: discord.Interaction):
     await interaction.followup.send(mensagem)
 
        
-client.run(f'{token}')
+client.run(token)
