@@ -152,7 +152,7 @@ async def loop_mudar_status():
         for atividade in atividades:
 
             await client.change_presence(activity=atividade)
-            await asyncio.sleep(15)
+            await asyncio.sleep(30)
 
 @client.event
 async def on_ready():
