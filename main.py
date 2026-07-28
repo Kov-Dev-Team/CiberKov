@@ -158,7 +158,7 @@ async def loop_mudar_status():
 async def on_ready():
     print(f'Online como: {client.user} (ID: {client.user.id})')
 
-client.loop.create_task(loop_mudar_status())    
+    client.loop.create_task(loop_mudar_status())    
 
 # IGOR PRUDOV ACESS        
 def e_dono():
