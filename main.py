@@ -6,11 +6,10 @@ import os
 from dotenv import load_dotenv
 from classes import ccf, clp
 from typing import Optional
-from discord.ext import commands
+from discord.ext import commands, tasks
 from discord import app_commands
 from discord import ui
-from datetime import datetime
-from datetime import timedelta
+from datetime import datetime, timedelta, time, timezone
 
 # HOSTING CONFIG
 load_dotenv()
@@ -19,6 +18,14 @@ token = os.getenv("DISCORD_TOKEN")
 # DISCORD SERVER (FEDERAÇÃO E STB) E COMMAND SYNC
 GUILD_IDS = [1162538768394367016, 1469139801365151787]
 MY_GUILDS = [discord.Object(id=guild_id) for guild_id in GUILD_IDS]
+
+# CONFIGURAÇÕES DO SISTEMA DE CARGOS DO PORÃO
+PORAO_GUILD_ID = 1162538768394367016 # ID do servidor alvo (Federação)
+PORAO_CANAL_LOG_ID = 1535213509388804176 # Substitua pelo ID do canal de texto para log
+PORAO_REQ1_CARGOS = [1198424819184705657, 1334263385034063925, 1193746862889508975] # Server Booster, Twitch Sub, Youtube Sub (Substituir IDs)
+PORAO_REQ2_CARGOS = [1218546165394571365, 1307834044758888560, 1251476070184652860, 1307835233894273165, 1250957159068598423, 1307843457443958804] # Os 5 cargos específicos (Substituir IDs)
+PORAO_REQ3_CARGO = 1475194128600924170 # Maioridade (Substituir ID)
+PORAO_CARGO_ENTREGA = 1534374904168841246 # Cargo "porão" (Substituir ID)
 
 class MyClient(discord.Client):
     def __init__(self, *, intents: discord.Intents):
@@ -154,11 +161,89 @@ async def loop_mudar_status():
             await client.change_presence(activity=atividade)
             await asyncio.sleep(30)
 
+tz_brasilia = timezone(timedelta(hours=-3))
+horario_verificacao = time(hour=12, minute=0, tzinfo=tz_brasilia)
+
+async def executa_verificacao_porao():
+    guild = client.get_guild(PORAO_GUILD_ID)
+    if not guild:
+        return
+
+    canal_log = guild.get_channel(PORAO_CANAL_LOG_ID)
+    
+    cargo_porao = guild.get_role(PORAO_CARGO_ENTREGA)
+    if not cargo_porao:
+        return
+
+    membros_adicionados = []
+    membros_removidos = []
+    
+    for membro in guild.members:
+        if membro.bot:
+            continue
+            
+        membro_cargos_ids = [c.id for c in membro.roles]
+        
+        req1_atendido = any(c_id in membro_cargos_ids for c_id in PORAO_REQ1_CARGOS)
+        req2_atendido = any(c_id in membro_cargos_ids for c_id in PORAO_REQ2_CARGOS)
+        req3_atendido = PORAO_REQ3_CARGO in membro_cargos_ids
+        
+        atende_todos_requisitos = req1_atendido and req2_atendido and req3_atendido
+        tem_cargo_porao = PORAO_CARGO_ENTREGA in membro_cargos_ids
+        
+        try:
+            if atende_todos_requisitos and not tem_cargo_porao:
+                await membro.add_roles(cargo_porao, reason="Sistema: Cumpriu os requisitos do porão")
+                membros_adicionados.append(membro.mention)
+                await asyncio.sleep(1)
+                
+            elif not atende_todos_requisitos and tem_cargo_porao:
+                await membro.remove_roles(cargo_porao, reason="Sistema: Não cumpre mais os requisitos do porão")
+                membros_removidos.append(membro.mention)
+                await asyncio.sleep(1)
+        except discord.Forbidden:
+            print(f"Sem permissão para alterar cargos do membro {membro.name}.")
+        except Exception as e:
+            print(f"Erro ao alterar cargos do membro {membro.name}: {e}")
+
+    if canal_log and (membros_adicionados or membros_removidos):
+        embed = discord.Embed(title="Log - Cargo Porão", color=discord.Color.purple(), timestamp=datetime.now(tz_brasilia))
+        
+        if membros_adicionados:
+            adicionados_str = ", ".join(membros_adicionados)
+            if len(adicionados_str) > 1000:
+                adicionados_str = adicionados_str[:1000] + "..."
+            embed.add_field(name="Cargo Concedido", value=adicionados_str, inline=False)
+            
+        if membros_removidos:
+            removidos_str = ", ".join(membros_removidos)
+            if len(removidos_str) > 1000:
+                removidos_str = removidos_str[:1000] + "..."
+            embed.add_field(name="Cargo Removido", value=removidos_str, inline=False)
+            
+        try:
+            await canal_log.send(embed=embed)
+        except Exception as e:
+            print(f"Erro ao enviar log: {e}")
+
+@tasks.loop(time=horario_verificacao)
+async def verificar_cargos_porao():
+    await executa_verificacao_porao()
+
+@verificar_cargos_porao.before_loop
+async def before_verificar_cargos_porao():
+    await client.wait_until_ready()
+
 @client.event
 async def on_ready():
     print(f'Online como: {client.user} (ID: {client.user.id})')
 
     client.loop.create_task(loop_mudar_status())    
+    
+    if not verificar_cargos_porao.is_running():
+        verificar_cargos_porao.start()
+        
+    client.loop.create_task(executa_verificacao_porao())
 
 # IGOR PRUDOV ACESS        
 def e_dono():
@@ -166,7 +251,14 @@ def e_dono():
         ID_DONO = 1047129198508113990 
         return interaction.user.id == ID_DONO
     return app_commands.check(predicate)        
-        
+
+@client.tree.command(name="forcar_verificacao", description="Força a execução da verificação de cargos do porão (Apenas Admins).")
+@app_commands.default_permissions(administrator=True)
+async def forcar_verificacao(interaction: discord.Interaction):
+    await interaction.response.defer(ephemeral=True)
+    await executa_verificacao_porao()
+    await interaction.followup.send("✅ Verificação de cargos executada com sucesso!")
+
 # V2 STANDARD COMMANDS FROM CLASSES      
 @client.tree.command()
 @app_commands.default_permissions(manage_messages=True)
